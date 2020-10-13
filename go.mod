@@ -6,7 +6,7 @@ require (
 	github.com/Shopify/sarama v1.22.1 // indirect
 	github.com/Workiva/go-datastructures v1.0.50 // indirect
 	github.com/aergoio/aergo-actor v0.0.0-20190219030625-562037d5fec7
-	github.com/aergoio/aergo-lib v1.0.2
+	github.com/aergoio/aergo-lib v1.0.3-0.20201013064744-cecd74d85e28
 	github.com/aergoio/etcd v0.0.0-20190429013412-e8b3f96f6399
 	github.com/anaskhan96/base58check v0.0.0-20181220122047-b05365d494c4
 	github.com/apache/thrift v0.12.0 // indirect
@@ -22,7 +22,6 @@ require (
 	github.com/funkygao/golib v0.0.0-20180314131852-90d4905c1961
 	github.com/gin-gonic/gin v1.5.0
 	github.com/gofrs/uuid v3.2.0+incompatible
-	github.com/gogo/protobuf v1.3.0
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.3
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645
