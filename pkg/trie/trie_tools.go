@@ -8,7 +8,6 @@ package trie
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/aergoio/aergo-lib/db"
 )
@@ -127,6 +126,7 @@ type WalkResult struct {
 
 // Walk finds all the trie stored values from left to right and calls callback.
 // If callback returns true, the walk will stop, else it will continue.
+// Warning: Walk() could finish before all callback functions have been executed.
 func (s *Trie) Walk(root []byte, callback func(*WalkResult) bool) error {
 	walkc := make(chan *WalkResult)
 	s.lock.RLock()
@@ -135,60 +135,46 @@ func (s *Trie) Walk(root []byte, callback func(*WalkResult) bool) error {
 		root = s.Root
 	}
 	s.atomicUpdate = false
-	close := make(chan (bool), 1)
+	finishedWalk := make(chan (bool), 1)
 	stop := false
-	wg := sync.WaitGroup{}
 	go func() {
 		for {
 			select {
-			case <-close:
-				break
+			case <-finishedWalk:
+				return
 			case value := <-walkc:
-				wg.Add(1)
 				if stop = callback(value); stop {
-					wg.Done()
 					break
 				}
-				wg.Done()
 			}
 		}
 	}()
 	err := s.walk(walkc, &stop, root, nil, 0, s.TrieHeight)
-	close <- true
-	wg.Wait()
+	finishedWalk <- true
 	return err
 }
 
 // walk fetches the value of a key given a trie root
-func (s *Trie) walk(walkc chan (*WalkResult), stop *bool, root []byte, batch [][]byte, iiBatch, height int) error {
+func (s *Trie) walk(walkc chan (*WalkResult), stop *bool, root []byte, batch [][]byte, ibatch, height int) error {
 	if len(root) == 0 || *stop {
-		// the trie does not contain the key or stop bool is set tu true
+		// The sub tree is empty or stop walking
 		return nil
 	}
 	// Fetch the children of the node
-	nbatch, iBatch, lnode, rnode, isShortcut, err := s.loadChildren(root, height, iiBatch, batch)
+	batch, ibatch, lnode, rnode, isShortcut, err := s.loadChildren(root, height, ibatch, batch)
 	if err != nil {
 		return err
 	}
 	if isShortcut {
-		var key []byte
-		if len(rnode) <= HashLength {
-			return nil
-		}
-		if string(nbatch[0]) == string([]byte{0x01}) {
-			key = nbatch[iBatch+1][:HashLength]
-		} else {
-			key = batch[2*iiBatch+1][:HashLength]
-		}
-		walkc <- &WalkResult{Value: rnode[:HashLength], Key: key}
+		walkc <- &WalkResult{Value: rnode[:HashLength], Key: lnode[:HashLength]}
 		return nil
 	}
 	// Go left
-	if err := s.walk(walkc, stop, lnode, nbatch, 2*iBatch+1, height-1); err != nil {
+	if err := s.walk(walkc, stop, lnode, batch, 2*ibatch+1, height-1); err != nil {
 		return err
 	}
 	// Go Right
-	if err := s.walk(walkc, stop, rnode, nbatch, 2*iBatch+2, height-1); err != nil {
+	if err := s.walk(walkc, stop, rnode, batch, 2*ibatch+2, height-1); err != nil {
 		return err
 	}
 	return nil

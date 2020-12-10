@@ -8,6 +8,7 @@ package trie
 import (
 	"bytes"
 	"runtime"
+	"sync"
 
 	//"io/ioutil"
 	"os"
@@ -220,20 +221,22 @@ func TestTrieWalk(t *testing.T) {
 
 	// Walk over the whole tree and compare the values
 	i := 0
+	wg := sync.WaitGroup{}
+	wg.Add(len(keys))
 	if err := smt.Walk(nil, func(v *WalkResult) bool {
-		if string(v.Value) != string(values[i]) {
+		if !bytes.Equal(v.Value, values[i]) {
 			t.Fatalf("walk value does not match %x != %x", v.Value, values[i])
-
 		}
-		if string(v.Key) != string(keys[i]) {
+		if !bytes.Equal(v.Key, keys[i]) {
 			t.Fatalf("walk key does not match %x != %x", v.Key, keys[i])
-
 		}
 		i++
+		wg.Done()
 		return false
 	}); err != nil {
 		t.Fatal(err)
 	}
+	wg.Wait()
 
 	// Delete two values (0 and 3)
 	if _, err := smt.Update([][]byte{keys[0], keys[3]}, [][]byte{DefaultLeaf, DefaultLeaf}); err != nil {
@@ -242,21 +245,24 @@ func TestTrieWalk(t *testing.T) {
 
 	// Delete two elements and walk again
 	i = 1
+	wg.Add(len(keys) - 2)
 	if err := smt.Walk(nil, func(v *WalkResult) bool {
 		if i == 3 {
 			i++
 		}
-		if string(v.Value) != string(values[i]) {
+		if !bytes.Equal(v.Value, values[i]) {
 			t.Fatalf("walk value does not match %x == %x\n", v.Value, values[i])
 		}
-		if string(v.Key) != string(keys[i]) {
+		if !bytes.Equal(v.Key, keys[i]) {
 			t.Fatalf("walk key does not match %x == %x\n", v.Key, keys[i])
 		}
 		i++
+		wg.Done()
 		return false
 	}); err != nil {
 		t.Fatal(err)
 	}
+	wg.Wait()
 
 	// Add one new value to preivous deleted key
 	values[3] = getFreshData(1, 32)[0]
@@ -267,10 +273,10 @@ func TestTrieWalk(t *testing.T) {
 	// Walk and check again
 	i = 1
 	if err := smt.Walk(nil, func(v *WalkResult) bool {
-		if string(v.Value) != string(values[i]) {
+		if !bytes.Equal(v.Value, values[i]) {
 			t.Fatalf("walk value does not match %x != %x\n", v.Value, values[i])
 		}
-		if string(v.Key) != string(keys[i]) {
+		if !bytes.Equal(v.Key, keys[i]) {
 			t.Fatalf("walk key does not match %x != %x\n", v.Key, keys[i])
 		}
 		i++
@@ -282,7 +288,7 @@ func TestTrieWalk(t *testing.T) {
 	// Find a specific value
 	i = 0
 	if err := smt.Walk(nil, func(v *WalkResult) bool {
-		if string(v.Value) == string(values[5]) {
+		if bytes.Equal(v.Value, values[5]) {
 			return true
 		}
 		i++
